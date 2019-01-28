@@ -9,7 +9,7 @@ now or anytime soon. Treat it like a sample of what will come during the
 
 Two binaries are produced by building this tool. The 'simple' netpipe is
 managed unencrypted over FIFOs that the caller manages. The more complex
-netproxy is currently built on TCP as a transport layer and do symmetric
+arcan-net is currently built on TCP as a transport layer and do symmetric
 encryption and authentication using pre-shared credentials.
 
 # Compilation
@@ -26,12 +26,9 @@ the system will fallback to raw- or only lightly- compressed buffers.
 The easiest way to test on a local system that already has arcan and one
 WM running with a terminal that has the ARCAN\_CONNPATH environment:
 
-    arcan-netpipe -T
-		ARCAN_CONNPATH=test /path/to/some/arcan_client
-
-For use on the display server side:
-
-    arcan-netproxy -l
+    arcan-net -l 6666
+		arcan-net -s test localhost 6666
+		ARCAN_CONNPATH=test afsrv_terminal
 
 # Todo
 
@@ -96,14 +93,14 @@ For arcan-netproxy, you are currently restricted to symmetric primitives
 derived from the password expected to be provided as env or on stdin.
 
 # Hacking
-To get a grasp of the codebase, the major components to understand is on
-the server side the "a12\_channel\_unpack" function. This function takes
-care of buffering, authentication, decryption and dispatch. It is stateful,
-and based on the current state it will forward a completed larger chunk
-to the corresponding process\_(xxx) function.
+To get a grasp of the codebase, the major components to understand for the
+server side the "a12\_channel\_unpack" function. This function takes care of
+buffering, authentication, decryption and dispatch. It is stateful, and based
+on the current state it will forward a completed larger chunk to the
+corresponding process\_(xxx) function.
 
-For sending/prividing output, first build the appropriate control packet
-for the basic command. When such a buffer is finished, send to the
+For sending/prividing output, first build the appropriate control packet for
+the basic command. When such a buffer is finished, send to the
 "a12int\_append\_out" function.
 
     uint8_t hdr_buf[CONTROL_PACKET_SIZE];
@@ -327,6 +324,9 @@ blocks or not by relying on a ping-stream.
 
 # Licenses
 
-arcan-net is (c) Bjorn Stahl 2017-2018 and licensed under the 3-clause BSD
+arcan-net is (c) Bjorn Stahl 2017-2019 and licensed under the 3-clause BSD
 license. It is dependent on BLAKE2- (CC or Apache-2.0, see COPYING.BLAKE2)
-and on UDT (Apache-2.0 / 3-clause BSD).
+and on ChaCha20 (Public Domain).
+
+optional dependencies include ffmpeg- suite of video codecs, GPLv2 with
+possible patent implications.

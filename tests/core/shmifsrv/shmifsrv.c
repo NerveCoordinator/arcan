@@ -6,46 +6,38 @@
 
 int main(int argc, char** argv)
 {
-	int fd = -1;
-	int sc = 0;
+/* setup our clock */
+	shmifsrv_monotonic_rebase();
 
 /* setup listening point */
 	struct shmifsrv_client* cl =
-		shmifsrv_allocate_connpoint("shmifsrv", NULL, S_IRWXU, &fd, &sc, 0);
-
-/* setup our clock */
-	shmifsrv_monotonic_rebase();
+		shmifsrv_allocate_connpoint("shmifsrv", NULL, S_IRWXU, -1);
 
 	if (!cl){
 		fprintf(stderr, "couldn't allocate connection point\n");
 		return EXIT_FAILURE;
 	}
 
-/* wait until something happens */
+	int server_fd = shmifsrv_client_handle(cl);
 
-	int pv = -1;
+/* wait for a connection */
 	while (true){
 		struct pollfd pfd = {
-			.fd = shmifsrv_client_handle(cl),
+			.fd = server_fd,
 			.events = POLLIN | POLLERR | POLLHUP
 		};
 
-		if (poll(&pfd, 1, pv) > 0){
-			if (pfd.revents){
-				if (pfd.revents != POLLIN)
-					break;
-				pv = 16;
-			}
+		int rv = poll(&pfd, 1, -1);
+		if (-1 == rv){
+			if (errno == EAGAIN || errno == EINTR)
+				continue;
+			break;
 		}
 
-/* flush or acknowledge buffer transfers */
+/* process client until its death */
 		int sv;
-		while ((sv = shmifsrv_poll(cl)) != CLIENT_NOT_READY){
-			if (sv == CLIENT_DEAD){
-				fprintf(stderr, "client died\n");
-				break;
-			}
-			else if (sv == CLIENT_VBUFFER_READY){
+		while ((sv = shmifsrv_poll(cl)) != CLIENT_DEAD){
+			if (sv == CLIENT_VBUFFER_READY){
 				struct shmifsrv_vbuffer buf = shmifsrv_video(cl, true);
 				fprintf(stderr, "[video] : %zu*%zu\n", buf.w, buf.h);
 			}
@@ -54,9 +46,8 @@ int main(int argc, char** argv)
 				fprintf(stderr,
 					"[audio], %zu samples @ %zu Hz", buf.samples, buf.samplerate);
 			}
-		}
 
-/* flush out events */
+	/* flush out events */
 		struct arcan_event ev;
 		while (1 == shmifsrv_dequeue_events(cl, &ev, 1)){
 /* PREROLL stage, need to send ACTIVATE */

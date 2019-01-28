@@ -28,13 +28,14 @@ static int run_shmif_server(
  * mode (single client) or socketed mode we fork off a server */
 	while(true){
 		struct shmifsrv_client* cl =
-			shmifsrv_allocate_connpoint(cp, NULL, S_IRWXU, &fd, &sc, 0);
+			shmifsrv_allocate_connpoint(cp, NULL, S_IRWXU, fd);
 
 		if (!cl){
 			fprintf(stderr, "couldn't allocate connection point\n");
 			return EXIT_FAILURE;
 		}
 
+/* extract handle first time */
 		if (-1 == fd)
 			fd = shmifsrv_client_handle(cl);
 

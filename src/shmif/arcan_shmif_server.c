@@ -109,18 +109,15 @@ struct shmifsrv_client*
 	return res;
 }
 
-struct shmifsrv_client*
-	shmifsrv_allocate_connpoint(const char* name, const char* key,
-	mode_t permission, int* fd, int* statuscode, uint32_t idtok)
+struct shmifsrv_client* shmifsrv_allocate_connpoint(
+	const char* name, const char* key, mode_t permission, int fd)
 {
-	int sc;
 	shmifsrv_monotonic_tick(NULL);
 	struct shmifsrv_client* res = alloc_client();
 	if (!res)
 		return NULL;
 
-	res->con = platform_fsrv_listen_external(
-		name, key, fd ? *fd : -1, permission, 0);
+	res->con = platform_fsrv_listen_external(name, key, fd, permission, 0);
 
 	if (!res->con){
 		free(res);

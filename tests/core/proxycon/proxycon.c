@@ -173,8 +173,6 @@ int main(int argc, char** argv)
 /* SIGINTR */
 		else
 			break;
-
-		proxy_client(cl);
 	}
 
 	return EXIT_FAILURE;

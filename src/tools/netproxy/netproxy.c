@@ -47,6 +47,17 @@ static void fork_a12srv(struct a12_state* S, int fd)
 {
 	pid_t fpid = fork();
 	if (fpid == 0){
+
+/* Split the log output on debug so we see what is going on */
+#ifdef _DEBUG
+		char buf[sizeof("cl_log_xxxxxx.log")];
+		snprintf(buf, sizeof(buf), "cl_log_%.6d.log", (int) getpid());
+		int newfd = open(buf, O_CREAT | O_RDWR, 0600);
+		if (-1 != newfd){
+			dup2(newfd, STDERR_FILENO);
+			close(newfd);
+		}
+#endif
 		int rc = a12helper_a12srv_shmifcl(S, NULL, fd, fd);
 		exit(rc < 0 ? EXIT_FAILURE : EXIT_SUCCESS);
 	}
@@ -59,6 +70,7 @@ static void fork_a12srv(struct a12_state* S, int fd)
 	else {
 /* just ignore and return to caller */
 		a12_channel_close(S);
+		close(fd);
 	}
 }
 
@@ -70,8 +82,8 @@ static void single_a12srv(struct a12_state* S, int fd)
 static void a12cl_dispatch(
 	struct a12_state* S, struct shmifsrv_client* cl, int fd)
 {
+/* note that the a12helper will do the cleanup / free */
 	a12helper_a12cl_shmifsrv(S, cl, fd, fd, (struct a12helper_opts){});
-	shmifsrv_free(cl);
 	a12_channel_close(S);
 }
 
@@ -154,76 +166,65 @@ static int a12_connect(struct a12_auth* auth,
 		return EXIT_FAILURE;
 	}
 
-/* depending on the dispatch routine, this may treat one or multiple clients at
- * the same time, note the _allocate_connpoint management is different from the
- * first time it is setup in response to repeated calls */
 	int shmif_fd = -1;
 	for(;;){
-		int sc;
 		struct shmifsrv_client* cl =
-			shmifsrv_allocate_connpoint(cpoint, NULL, S_IRWXU, &shmif_fd, &sc, 0);
+			shmifsrv_allocate_connpoint(cpoint, NULL, S_IRWXU, shmif_fd);
 
-		if (!cl || -1 == shmifsrv_client_handle(cl)){
-			if (shmif_fd == -1){
-				freeaddrinfo(addr);
-				fprintf(stderr, "couldn't open connection point\n");
-				return EXIT_FAILURE;
-			}
-			else {
-				fprintf(stderr, "couldn't re-open connection point, sleep-retry\n");
-				if (cl)
-					shmifsrv_free(cl);
-				sleep(5);
-				continue;
-			}
+		if (!cl){
+			freeaddrinfo(addr);
+			fprintf(stderr, "couldn't open connection point\n");
+			return EXIT_FAILURE;
 		}
 
-		struct pollfd pfd = {
-			.fd = shmifsrv_client_handle(cl), .events = POLLIN | POLLERR | POLLHUP
-		};
+/* first time, extract the connection point descriptor from the connection */
+		if (-1 == shmif_fd)
+			shmif_fd = shmifsrv_client_handle(cl);
 
-/* wait for a shmif- connection locally */
+		struct pollfd pfd = {.fd = shmif_fd, .events = POLLIN | POLLERR | POLLHUP};
+
+/* wait for a connection */
 		for(;;){
 			int pv = poll(&pfd, 1, -1);
 			if (-1 == pv){
 				if (errno != EINTR && errno != EAGAIN){
+					freeaddrinfo(addr);
 					shmifsrv_free(cl);
-					fprintf(stderr, "poll on shmif client failed, rebuilding\n");
-					break;
+					fprintf(stderr, "error while waiting for a connection\n");
+					return EXIT_FAILURE;
 				}
 				continue;
 			}
-
-/* setup remote connection and activate local one */
-			if (pfd.revents & (~POLLIN)){
-				shmifsrv_free(cl);
-				fprintf(stderr, "shmif client connection died, rebuilding\n");
+			else if (pv)
 				break;
-			}
+		}
 
-/* this could be done inside of the dispatch to get faster burst management
+/* accept it (this will mutate the client_handle internally) */
+		shmifsrv_poll(cl);
+
+/* open remote connection
+ * this could be done inside of the dispatch to get faster burst management
  * at the cost of worse error reporting */
-			int fd = get_cl_fd(addr);
-			if (-1 == fd){
+		int fd = get_cl_fd(addr);
+		if (-1 == fd){
 /* question if we should retry connecting rather than to kill the server */
-				shmifsrv_free(cl);
-				continue;
-			}
+			shmifsrv_free(cl);
+			continue;
+		}
 
 /* finally hand setup off to the dispatch */
-			struct a12_state* state = a12_channel_open(auth->authk, auth->authk_sz);
-			if (!state){
-				freeaddrinfo(addr);
-				shmifsrv_free(cl);
-				close(fd);
-				fprintf(stderr, "couldn't build a12 state machine\n");
-				return EXIT_FAILURE;
-			}
+		struct a12_state* state = a12_channel_open(auth->authk, auth->authk_sz);
+		if (!state){
+			freeaddrinfo(addr);
+			shmifsrv_free(cl);
+			close(fd);
+			fprintf(stderr, "couldn't build a12 state machine\n");
+			return EXIT_FAILURE;
+		}
 
 /* wake the client */
-			debug_print(1, "local connection found, forwarding to dispatch");
-			dispatch(state, cl, fd);
-		}
+		debug_print(1, "local connection found, forwarding to dispatch");
+		dispatch(state, cl, fd);
 	}
 
 	return EXIT_SUCCESS;

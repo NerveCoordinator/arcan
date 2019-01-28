@@ -104,25 +104,31 @@ struct shmifsrv_client*
  * the target socket. The function returns a valid server context or NULL with
  * the reason for failure in statuscode.
  *
- * [fd, can be NULL] is a state tracking file descriptor in order to reopen
- * the connection point after it having been consumed by a connection.
- * Example:
+ * Design / legacy quirk:
+ * The listening socket is contained within shmifsrv_client and should be
+ * extracted using shmifsrv_client_handle. If a client connects (see
+ * shmifsrv_poll), this handle with mutate internally to that of the accepted
+ * connection and it is the responsibility of the caller to either close
+ * the descriptor or use it as the [fd] argument to this function in order
+ * to re-open the connection point.
  *
- * int fdstate = -1;
- * int sc;
- * struct shmifsrv_client* cl = shmifsrv_allocate_connpoint(
- * 	"demo", NULL, S_IRWXU, &fdstate, &sc);
+ * Example use:
+ * struct shmifsrv_client* cl =
+ *   shmifsrv_allocate_connpoint("demo", NULL, S_IRWXU, -1);
  *
  * if (!cl)
- *    handle_allocation_error();
- *
- * ... poll [cl until connected] ..
- * shmifsrv_allocate_connpoint("demo", NULL, S_IRWXU, &fdstate, &sc);
+ *  error("couldn't allocate resources");
+
+ * int server_fd = shmifsrv_client_handler(cl);
+ * while(cl){
+ *    ... poll / wait in activity on server_fd ...
+ *    dispatch_client(cl); (have a thread/loop that runs shmifsrv_poll)
+ *    cl = shmifsrv_allocate_connpoint("demo", NULL, S_IRWXU, server_fd);
+ * }
  *
  */
-struct shmifsrv_client*
-	shmifsrv_allocate_connpoint(const char* name, const char* key,
-	mode_t permission, int* fd, int* statuscode, uint32_t idtok);
+struct shmifsrv_client* shmifsrv_allocate_connpoint(
+	const char* name, const char* key, mode_t permission, int fd);
 
 /*
  * Setup a connection-less frameserver, meaning that all primitives and

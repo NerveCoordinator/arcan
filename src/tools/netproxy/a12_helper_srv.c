@@ -229,5 +229,4 @@ out:
 	fclose(fpek_in);
 #endif
 	debug_print(1, "(srv) shutting down connection");
-	shmifsrv_free(C);
 }

@@ -9,6 +9,9 @@ counter/ provides a simple color cycle in a predictable pattern
 
 resizor/ switches color on each displayhint that triggers a resize
 
+netenc/ provides basic controls for interactive testing of the various
+ transfer types
+
 counter-ndt/ uses a known color cycle and multi-buffering to test
  how arcan selects buffers in multi-buffer mode
 

@@ -147,22 +147,19 @@ static bool fd_avail(int fd, bool* term)
 	int sv = poll(&fds, 1, 0);
 	*term = false;
 
-	if (-1 == sv){
-		if (errno != EINTR && errno != EAGAIN)
+	if (sv > 0){
+		if ((fds.revents & (POLLERR | POLLHUP | POLLNVAL)) > 0){
 			*term = true;
-
+			return false;
+		}
+		return true;
+	}
+	else if (-1 == sv){
+		*term = true;
 		return false;
 	}
-
-	if (0 == sv)
-		return false;
-
-	if (fds.revents & (POLLERR | POLLHUP | POLLNVAL))
-		*term = true;
 	else
-		return true;
-
-	return false;
+		return false;
 }
 
 bool platform_fsrv_lastwords(struct arcan_frameserver* src, char* dst, size_t n)

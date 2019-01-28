@@ -86,16 +86,16 @@ set(SOURCES
 )
 
 add_executable( arcan-netpipe ${SOURCES} netpipe.c)
-add_executable( arcan-netproxy ${SOURCES} netproxy.c)
+add_executable( arcan-net ${SOURCES} netproxy.c)
 add_sanitizers( arcan-netpipe )
-add_sanitizers( arcan-netproxy )
+add_sanitizers( arcan-net )
 
 set_property(TARGET arcan-netpipe PROPERTY C_STANDARD 11)
-set_property(TARGET arcan-netproxy PROPERTY C_STANDARD 11)
+set_property(TARGET arcan-net PROPERTY C_STANDARD 11)
 
 target_link_libraries(arcan-netpipe ${LIBRARIES})
-target_link_libraries(arcan-netproxy ${LIBRARIES})
+target_link_libraries(arcan-net ${LIBRARIES})
 
 install(TARGETS
-	arcan-netproxy arcan-netpipe
+	arcan-net arcan-netpipe
 	DESTINATION bin)

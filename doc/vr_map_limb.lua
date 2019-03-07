@@ -14,7 +14,7 @@
 -- attributes will be derived/inherited as normal.
 -- @note: The targeted model will not behave as a normal object while mapped in
 -- regards to transformation chains and other positional/rotational properties,
--- menaing that operations e.g. forward3d_model will produce undefined results.
+-- meaning that operations e.g. forward3d_model will produce undefined results.
 -- @group: iodev
 -- @cfunction: vr_maplimb
 -- @related:
